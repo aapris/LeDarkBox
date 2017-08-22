@@ -1,15 +1,27 @@
 #include <FastLED.h>
 
-#define LED_PIN     13    // D7
-#define CLK_PIN     14    // D5
+#define DEBUG             // uncomment for some debug messages
+
+#define LED_PIN     D7  // 13    // D7
+#define CLK_PIN     D5  // 14    // D5
 #define NUM_LEDS    208
-#define BRIGHTNESS  64
+#define BRIGHTNESS  255
 //#define LED_TYPE    WS2811
 #define LED_TYPE    LPD8806
 #define COLOR_ORDER GRB
 CRGB leds[NUM_LEDS];
 
 #define UPDATES_PER_SECOND 100
+
+const byte interruptPin = 2; // D4
+volatile byte interruptCounter = 0;
+int numberOfInterrupts = 0;
+long lastInterruptTime = 0;
+
+const byte interruptPin2 = D2; 
+volatile byte interruptCounter2 = 0;
+int numberOfInterrupts2 = 0;
+long lastInterruptTime2 = 0;
 
 // This example shows several ways to set up and use 'palettes' of colors
 // with FastLED.
@@ -39,6 +51,11 @@ long cnt = 0;
 
 void setup() {
     Serial.begin(115200);
+    pinMode(interruptPin, INPUT_PULLUP);
+    pinMode(interruptPin2, INPUT_PULLUP);
+    attachInterrupt(digitalPinToInterrupt(interruptPin), handleInterrupt, FALLING);
+    attachInterrupt(digitalPinToInterrupt(interruptPin2), handleInterrupt2, RISING);
+
     Serial.println();
     Serial.println();
     Serial.println("Waiting 3 sec...");
@@ -56,11 +73,27 @@ void setup() {
 
 void loop()
 {
-    if (cnt % 100 == 0) {
+    if (cnt % 1000 == 0) {
       Serial.print("looping ");
       Serial.println(cnt);
     }
     cnt++;
+
+    if (interruptCounter>0){
+      interruptCounter--;
+      numberOfInterrupts++;
+      Serial.print("An interrupt has occurred. Total: ");
+      Serial.println(numberOfInterrupts);
+    }
+
+    if (interruptCounter2>0){
+      interruptCounter2--;
+      numberOfInterrupts2++;
+      Serial.print("A PIR interrupt has occurred. Total: ");
+      Serial.println(numberOfInterrupts2);
+    }
+
+    
     ChangePalettePeriodically();
     
     static uint8_t startIndex = 0;
@@ -71,6 +104,34 @@ void loop()
     FastLED.show();
     FastLED.delay(1000 / UPDATES_PER_SECOND);
 }
+
+
+void debug(const String& msg) {
+#ifdef DEBUG
+  Serial.println(msg);
+#endif
+}
+
+
+void handleInterrupt() {
+  // Serial.println((millis() - lastInterruptTime));
+  if ((millis() - lastInterruptTime) < 1000) {
+    return;
+  }
+  lastInterruptTime = millis();
+  interruptCounter++;
+}
+
+
+void handleInterrupt2() {
+  // Serial.println((millis() - lastInterruptTime));
+  if ((millis() - lastInterruptTime2) < 1000) {
+    return;
+  }
+  lastInterruptTime2 = millis();
+  interruptCounter2++;
+}
+
 
 void FillLEDsFromPaletteColors( uint8_t colorIndex)
 {
@@ -93,22 +154,54 @@ void FillLEDsFromPaletteColors( uint8_t colorIndex)
 
 void ChangePalettePeriodically()
 {
-    uint8_t secondHand = (millis() / 1000) % 60;
+    // uint8_t secondHand = (millis() / 1000) % 60;
+    uint8_t secondHand = numberOfInterrupts % 8;
     static uint8_t lastSecond = 99;
-    
-    if( lastSecond != secondHand) {
-        lastSecond = secondHand;
-        if( secondHand ==  0)  { currentPalette = RainbowColors_p;         currentBlending = LINEARBLEND; }
-        if( secondHand == 10)  { currentPalette = RainbowStripeColors_p;   currentBlending = NOBLEND;  }
-        if( secondHand == 15)  { currentPalette = RainbowStripeColors_p;   currentBlending = LINEARBLEND; }
-        if( secondHand == 20)  { SetupPurpleAndGreenPalette();             currentBlending = LINEARBLEND; }
-        if( secondHand == 25)  { SetupTotallyRandomPalette();              currentBlending = LINEARBLEND; }
-        if( secondHand == 30)  { SetupBlackAndWhiteStripedPalette();       currentBlending = NOBLEND; }
-        if( secondHand == 35)  { SetupBlackAndWhiteStripedPalette();       currentBlending = LINEARBLEND; }
-        if( secondHand == 40)  { currentPalette = CloudColors_p;           currentBlending = LINEARBLEND; }
-        if( secondHand == 45)  { currentPalette = PartyColors_p;           currentBlending = LINEARBLEND; }
-        if( secondHand == 50)  { currentPalette = myRedWhiteBluePalette_p; currentBlending = NOBLEND;  }
-        if( secondHand == 55)  { currentPalette = myRedWhiteBluePalette_p; currentBlending = LINEARBLEND; }
+    if (secondHand != lastSecond) {
+      lastSecond = secondHand;
+      
+      if( secondHand ==  0)  { 
+        debug("Rainbow");
+        currentPalette = RainbowColors_p;         
+        currentBlending = LINEARBLEND; }
+        
+      //if( secondHand == 10)  { currentPalette = RainbowStripeColors_p;   currentBlending = NOBLEND;  }
+      if( secondHand == 1)  { 
+        debug("Rainbow stripe");
+        currentPalette = RainbowStripeColors_p;   
+        currentBlending = LINEARBLEND; }
+  
+      if( secondHand == 2)  { 
+        debug("purple gree");
+        SetupPurpleAndGreenPalette();             
+        currentBlending = LINEARBLEND; }
+        
+      if( secondHand == 3)  {
+        debug("random");
+        SetupTotallyRandomPalette();             
+        currentBlending = LINEARBLEND; }
+      //if( secondHand == 30)  { SetupBlackAndWhiteStripedPalette();       currentBlending = NOBLEND; }
+  
+      if( secondHand == 4)  {
+        debug("B & W");
+        SetupBlackAndWhiteStripedPalette();   
+        currentBlending = LINEARBLEND; }
+        
+      if( secondHand == 5)  { 
+        debug("cloud");
+        currentPalette = CloudColors_p;
+        currentBlending = LINEARBLEND; }
+        
+      if( secondHand == 6)  { 
+        debug("party");
+        currentPalette = PartyColors_p;   
+        currentBlending = LINEARBLEND; }
+        
+      //if( secondHand == 50)  { currentPalette = myRedWhiteBluePalette_p; currentBlending = NOBLEND;  }
+      if( secondHand == 7)  { 
+        debug("red white blue");
+        currentPalette = myRedWhiteBluePalette_p; 
+        currentBlending = LINEARBLEND; }
     }
 }
 
